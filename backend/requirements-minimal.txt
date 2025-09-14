@@ -1,0 +1,10 @@
+Flask
+Flask-CORS
+boto3
+pandas
+numpy
+python-dotenv
+anthropic
+e2b
+werkzeug
+gunicorn
