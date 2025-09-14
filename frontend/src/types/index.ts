@@ -1,6 +1,6 @@
 export interface FileData {
   filename: string
-  s3_key: string
+  storage_key: string
   columns: string[]
   preview: Record<string, any>[]
   shape: {
@@ -10,7 +10,7 @@ export interface FileData {
 }
 
 export interface ProcessingResult {
-  processed_s3_key: string
+  processed_storage_key: string
   statistics: {
     original_shape: [number, number]
     cleaned_shape: [number, number]

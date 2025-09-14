@@ -1,8 +1,12 @@
 import { useState } from 'react'
-import { PlayIcon } from '@heroicons/react/24/solid'
 import toast from 'react-hot-toast'
 import axios from 'axios'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { FileData, ProcessingResult } from '../types'
+import { Play, FileText, Target, BarChart3, Brain, CheckCircle, Info } from 'lucide-react'
 
 interface PipelineRunnerProps {
   fileData: FileData
@@ -17,24 +21,39 @@ export default function PipelineRunner({
 }: PipelineRunnerProps) {
   const [processing, setProcessing] = useState(false)
   const [status, setStatus] = useState<string>('')
+  const [currentStep, setCurrentStep] = useState<number>(0)
+
+  const steps = [
+    'Analyzing dataset structure',
+    'Generating preprocessing code with Claude AI',
+    'Executing code in secure sandbox',
+    'Preparing cleaned dataset',
+    'Finalizing results'
+  ]
 
   const runPipeline = async () => {
     setProcessing(true)
+    setCurrentStep(0)
     setStatus('Initializing preprocessing pipeline...')
 
     try {
+      setCurrentStep(1)
       setStatus('Generating preprocessing code with Claude...')
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate processing time
 
+      setCurrentStep(2)
       const response = await axios.post('/api/preprocess', {
-        s3_key: fileData.s3_key,
+        storage_key: fileData.storage_key,
         target_column: targetColumn,
       })
 
       if (response.data.success) {
+        setCurrentStep(3)
         setStatus('Fetching download URL...')
 
-        const downloadResponse = await axios.get(`/api/download/${response.data.data.processed_s3_key}`)
+        const downloadResponse = await axios.get(`/api/download/${encodeURIComponent(response.data.data.processed_storage_key.replace('/', '__'))}`)
 
+        setCurrentStep(4)
         const result: ProcessingResult = {
           ...response.data.data,
           download_url: downloadResponse.data.download_url,
@@ -50,78 +69,153 @@ export default function PipelineRunner({
       setStatus('')
     } finally {
       setProcessing(false)
+      setCurrentStep(0)
     }
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-900 mb-2">Pipeline Configuration</h3>
-        <div className="space-y-1 text-sm text-blue-800">
-          <p>• File: {fileData.filename}</p>
-          <p>• Target Column: {targetColumn}</p>
-          <p>• Original Shape: {fileData.shape.rows} rows × {fileData.shape.columns} columns</p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      {/* Configuration Card */}
+      <Card className="rounded-apple-lg shadow-apple-lg border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-start space-x-3">
+            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+              <FileText size={16} className="text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-headline text-foreground">Pipeline Configuration</h3>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between py-2 border-b border-primary/10 last:border-b-0">
+              <span className="text-callout text-muted-foreground">Dataset</span>
+              <Badge variant="outline" className="font-medium">{fileData.filename}</Badge>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-primary/10 last:border-b-0">
+              <span className="text-callout text-muted-foreground">Target Column</span>
+              <Badge className="bg-primary text-primary-foreground">{targetColumn}</Badge>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-callout text-muted-foreground">Data Size</span>
+              <span className="text-callout text-foreground font-medium">
+                {fileData.shape.rows.toLocaleString()} × {fileData.shape.columns}
+              </span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="space-y-3">
-        <button
+      {/* Action Button */}
+      <div className="space-y-4">
+        <Button
           onClick={runPipeline}
           disabled={processing}
-          className={`w-full flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white
-            ${processing
-              ? 'bg-gray-400 cursor-not-allowed'
-              : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
-            }`}
+          size="lg"
+          className="group w-full rounded-apple shadow-apple hover:shadow-apple-lg active:scale-[0.98] transition-all duration-200"
         >
           {processing ? (
-            <>
-              <svg
-                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Processing...
-            </>
+            <div className="flex items-center space-x-3">
+              <div className="flex space-x-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 bg-primary-foreground rounded-full animate-pulse"
+                    style={{ animationDelay: `${i * 0.2}s` }}
+                  />
+                ))}
+              </div>
+              <span>Processing Your Data...</span>
+            </div>
           ) : (
-            <>
-              <PlayIcon className="w-5 h-5 mr-2" />
-              Start LLM Pipeline
-            </>
+            <div className="flex items-center space-x-2">
+              <Play size={20} className="transition-transform duration-200 group-hover:scale-110" />
+              <span>Start AI Preprocessing</span>
+            </div>
           )}
-        </button>
+        </Button>
 
-        {status && (
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-sm text-gray-600">{status}</p>
-          </div>
+        {/* Progress Steps */}
+        {processing && (
+          <Card className="animate-fade-in rounded-apple-lg shadow-apple bg-muted/50">
+            <CardContent className="p-5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-callout text-foreground font-medium">Processing Steps</p>
+                  <Badge variant="secondary">{currentStep + 1}/{steps.length}</Badge>
+                </div>
+
+                <div className="space-y-3">
+                  {steps.map((step, index) => (
+                    <div key={step} className="flex items-center space-x-3">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        index < currentStep
+                          ? 'bg-chart-2 text-white'
+                          : index === currentStep
+                          ? 'bg-primary text-primary-foreground animate-pulse'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {index < currentStep ? (
+                          <CheckCircle size={14} />
+                        ) : (
+                          <span className="text-caption font-bold">{index + 1}</span>
+                        )}
+                      </div>
+                      <p className={`text-callout transition-colors duration-300 ${
+                        index <= currentStep ? 'text-foreground' : 'text-muted-foreground'
+                      }`}>
+                        {step}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {status && (
+                  <div className="pt-3 border-t border-border">
+                    <p className="text-footnote text-muted-foreground italic">{status}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-        <h4 className="font-medium text-amber-900 mb-2">What will happen:</h4>
-        <ol className="list-decimal list-inside space-y-1 text-sm text-amber-800">
-          <li>Claude will analyze your dataset structure</li>
-          <li>Generate custom preprocessing code for your data</li>
-          <li>Execute the code in a secure E2B sandbox</li>
-          <li>Return the cleaned dataset for download</li>
-        </ol>
-      </div>
+      {/* Information Panel */}
+      <Card className="rounded-apple-lg shadow-apple-lg bg-gradient-to-r from-primary/5 to-chart-4/5 border-border">
+        <CardContent className="p-5">
+          <div className="flex items-start space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-primary to-chart-4 rounded-full flex items-center justify-center flex-shrink-0">
+              <Brain size={16} className="text-white" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-headline text-foreground mb-3">AI Preprocessing Pipeline</h4>
+              <div className="space-y-2 text-callout text-muted-foreground">
+                <p className="text-foreground">Our intelligent system will automatically:</p>
+                <ul className="space-y-1.5 ml-4">
+                  <li className="flex items-start space-x-2">
+                    <div className="w-1 h-1 bg-primary rounded-full mt-2.5 flex-shrink-0" />
+                    <span>Analyze your dataset structure and data types</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <div className="w-1 h-1 bg-primary rounded-full mt-2.5 flex-shrink-0" />
+                    <span>Handle missing values with intelligent imputation</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <div className="w-1 h-1 bg-primary rounded-full mt-2.5 flex-shrink-0" />
+                    <span>Detect and remove outliers using statistical methods</span>
+                  </li>
+                  <li className="flex items-start space-x-2">
+                    <div className="w-1 h-1 bg-primary rounded-full mt-2.5 flex-shrink-0" />
+                    <span>Standardize features for optimal model performance</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

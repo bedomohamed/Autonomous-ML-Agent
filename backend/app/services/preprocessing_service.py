@@ -11,7 +11,9 @@ logger = logging.getLogger(__name__)
 
 class PreprocessingService:
     def __init__(self):
-        self.claude_client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        self.claude_client = Anthropic(
+            api_key=os.getenv('ANTHROPIC_API_KEY')
+        )
         self.e2b_api_key = os.getenv('E2B_API_KEY')
 
     def generate_preprocessing_code(self, df_sample: pd.DataFrame, target_column: str) -> str:

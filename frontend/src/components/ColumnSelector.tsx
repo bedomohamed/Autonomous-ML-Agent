@@ -1,6 +1,6 @@
-import { Fragment } from 'react'
-import { Listbox, Transition } from '@headlessui/react'
-import { CheckIcon, ChevronUpDownIcon } from '@heroicons/react/20/solid'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Target, CheckCircle } from 'lucide-react'
 
 interface ColumnSelectorProps {
   columns: string[]
@@ -14,62 +14,66 @@ export default function ColumnSelector({
   onColumnSelect,
 }: ColumnSelectorProps) {
   return (
-    <div className="max-w-md">
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        Select Target Column for Prediction
-      </label>
-      <Listbox value={selectedColumn} onChange={onColumnSelect}>
-        <div className="relative">
-          <Listbox.Button className="relative w-full cursor-default rounded-lg bg-white py-2 pl-3 pr-10 text-left border border-gray-300 focus:outline-none focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-300 sm:text-sm">
-            <span className="block truncate">
-              {selectedColumn || 'Select a column...'}
-            </span>
-            <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronUpDownIcon
-                className="h-5 w-5 text-gray-400"
-                aria-hidden="true"
+    <div className="space-y-4">
+      <div>
+        <label className="block text-headline text-foreground mb-1">
+          Target Column for Prediction
+        </label>
+        <p className="text-footnote text-muted-foreground">
+          Choose the column you want to predict or classify
+        </p>
+      </div>
+
+      <div className="max-w-sm">
+        <Select value={selectedColumn} onValueChange={onColumnSelect}>
+          <SelectTrigger className="w-full rounded-apple border-border shadow-apple hover:shadow-apple-lg transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary">
+            <div className="flex items-center space-x-3">
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                selectedColumn ? 'bg-primary' : 'bg-muted-foreground'
+              }`} />
+              <SelectValue
+                placeholder="Select a column..."
+                className={`text-callout ${selectedColumn ? 'text-foreground font-medium' : 'text-muted-foreground'}`}
               />
-            </span>
-          </Listbox.Button>
-          <Transition
-            as={Fragment}
-            leave="transition ease-in duration-100"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <Listbox.Options className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
-              {columns.map((column) => (
-                <Listbox.Option
-                  key={column}
-                  className={({ active }) =>
-                    `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                      active ? 'bg-primary-100 text-primary-900' : 'text-gray-900'
-                    }`
-                  }
-                  value={column}
-                >
-                  {({ selected }) => (
-                    <>
-                      <span
-                        className={`block truncate ${
-                          selected ? 'font-medium' : 'font-normal'
-                        }`}
-                      >
-                        {column}
-                      </span>
-                      {selected ? (
-                        <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-primary-600">
-                          <CheckIcon className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                      ) : null}
-                    </>
+            </div>
+          </SelectTrigger>
+          <SelectContent className="rounded-apple border-border shadow-apple-xl bg-popover/95 backdrop-blur-xl">
+            {columns.map((column, index) => (
+              <SelectItem
+                key={column}
+                value={column}
+                className="cursor-pointer focus:bg-accent/50 rounded-apple transition-all duration-150"
+              >
+                <div className="flex items-center space-x-3 w-full">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    selectedColumn === column ? 'bg-primary' : 'bg-muted-foreground'
+                  }`} />
+                  <div className="flex-1">
+                    <p className="text-callout truncate">
+                      {column}
+                    </p>
+                    <p className="text-caption text-muted-foreground">
+                      Column {index + 1}
+                    </p>
+                  </div>
+                  {selectedColumn === column && (
+                    <CheckCircle size={14} className="text-primary" />
                   )}
-                </Listbox.Option>
-              ))}
-            </Listbox.Options>
-          </Transition>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {selectedColumn && (
+        <div className="animate-fade-in">
+          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/20">
+            <Target size={12} className="mr-1" />
+            Target: {selectedColumn}
+          </Badge>
         </div>
-      </Listbox>
+      )}
     </div>
   )
 }
