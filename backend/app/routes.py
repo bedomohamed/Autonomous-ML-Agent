@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import logging
+import uuid
 from werkzeug.utils import secure_filename
 from app.services.local_storage_service import LocalStorageService
 # from app.services.preprocessing_service import PreprocessingService  # Deprecated - using Claude/E2B services
@@ -500,9 +501,29 @@ def execute_training():
         storage_service = LocalStorageService()
         cleaned_csv_path = storage_service.download_file(cleaned_storage_key)
 
+        # Save training code to models directory before execution
+        backend_dir = os.path.dirname(current_app.root_path)  # Go up from app to backend
+        models_dir = os.path.join(backend_dir, 'storage', 'models')
+        os.makedirs(models_dir, exist_ok=True)  # Ensure directory exists
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        execution_id = str(uuid.uuid4())[:8]
+        training_code_filename = f"training_code_{timestamp}_{execution_id}.py"
+        training_code_path = os.path.join(models_dir, training_code_filename)
+
+        try:
+            with open(training_code_path, 'w', encoding='utf-8') as f:
+                f.write(training_code)
+            logger.info(f"Training code saved to: {training_code_path}")
+        except Exception as e:
+            logger.error(f"Failed to save training code: {str(e)}")
+
         # Execute training in E2B sandbox
         e2b_service = E2BService()
         execution_result = e2b_service.execute_training_code(training_code, cleaned_csv_path)
+
+        # Add saved file path to execution result
+        execution_result['saved_training_code_path'] = training_code_path
+        execution_result['training_code_filename'] = training_code_filename
 
         # Note: Keep cleaned data file for potential re-training or analysis
 
@@ -517,7 +538,9 @@ def execute_training():
                         'model_files': execution_result.get('model_files', []),
                         'results': execution_result.get('results', {}),
                         'stdout': execution_result.get('stdout', ''),
-                        'stderr': execution_result.get('stderr', '')
+                        'stderr': execution_result.get('stderr', ''),
+                        'saved_training_code_path': execution_result.get('saved_training_code_path', ''),
+                        'training_code_filename': execution_result.get('training_code_filename', '')
                     }
                 },
                 'message': 'Model training executed successfully in E2B sandbox'
@@ -531,6 +554,46 @@ def execute_training():
 
     except Exception as e:
         return jsonify({'error': f'Model training execution failed: {str(e)}'}), 500
+
+@api_bp.route('/saved-training-codes', methods=['GET'])
+def list_saved_training_codes():
+    """List all saved training code files"""
+    try:
+        backend_dir = os.path.dirname(current_app.root_path)  # Go up from app to backend
+        models_dir = os.path.join(backend_dir, 'storage', 'models')
+
+        if not os.path.exists(models_dir):
+            os.makedirs(models_dir, exist_ok=True)
+            return jsonify({
+                'success': True,
+                'data': [],
+                'message': 'No training codes saved yet'
+            }), 200
+
+        training_files = []
+        for filename in os.listdir(models_dir):
+            if filename.endswith('.py') and filename.startswith('training_code_'):
+                file_path = os.path.join(models_dir, filename)
+                file_stats = os.stat(file_path)
+
+                training_files.append({
+                    'filename': filename,
+                    'created_at': datetime.fromtimestamp(file_stats.st_ctime).isoformat(),
+                    'size_bytes': file_stats.st_size,
+                    'full_path': file_path
+                })
+
+        # Sort by creation time (newest first)
+        training_files.sort(key=lambda x: x['created_at'], reverse=True)
+
+        return jsonify({
+            'success': True,
+            'data': training_files,
+            'message': f'Found {len(training_files)} saved training code files'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to list training codes: {str(e)}'}), 500
 
 @api_bp.route('/e2b/health', methods=['GET'])
 def e2b_health_check():
@@ -641,6 +704,244 @@ def list_processed_files():
 
     except Exception as e:
         return jsonify({'error': f'Failed to list processed files: {str(e)}'}), 500
+
+@api_bp.route('/tune-hyperparameters', methods=['POST'])
+def tune_hyperparameters():
+    """Generate hyperparameter tuning code for best performing models"""
+    try:
+        data = request.get_json()
+
+        # Required parameters
+        baseline_results = data.get('baseline_results', {})
+        top_models = data.get('top_models', [])
+        experiment_id = data.get('experiment_id')
+
+        if not baseline_results or not top_models:
+            return jsonify({
+                'error': 'Missing required parameters: baseline_results and top_models'
+            }), 400
+
+        logger.info(f"Generating hyperparameter tuning code for models: {top_models}")
+
+        # Initialize Claude service
+        claude_service = ClaudeService()
+
+        # Generate hyperparameter tuning code
+        tuning_result = claude_service.generate_hyperparameter_tuning_code(
+            baseline_results=baseline_results,
+            top_models=top_models
+        )
+
+        # Initialize local storage service
+        storage_service = LocalStorageService()
+
+        # Generate unique filename for tuning code
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        tuning_filename = f"{timestamp}_{unique_id}_hyperparameter_tuning_{experiment_id}.py"
+
+        # Save tuning code to storage/models directory
+        tuning_storage_key = f"models/{tuning_filename}"
+        tuning_code_with_header = f"""# Hyperparameter Tuning Code
+# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+# Experiment ID: {experiment_id}
+# Models to tune: {', '.join(top_models)}
+
+{tuning_result['tuning_code']}
+"""
+
+        # Store the tuning code directly to file system
+        storage_path = os.path.join(storage_service.storage_root, tuning_storage_key)
+        os.makedirs(os.path.dirname(storage_path), exist_ok=True)
+
+        with open(storage_path, 'w', encoding='utf-8') as f:
+            f.write(tuning_code_with_header)
+
+        logger.info(f"Hyperparameter tuning code saved to: {tuning_storage_key}")
+
+        # Prepare response
+        response_data = {
+            'tuning_code': tuning_result['tuning_code'],
+            'models_to_tune': tuning_result['models_to_tune'],
+            'search_strategy': tuning_result.get('search_strategy', 'GridSearchCV'),
+            'parameter_grids': tuning_result.get('parameter_grids', {}),
+            'estimated_tuning_time': tuning_result.get('estimated_tuning_time', 300),  # 5 minutes default
+            'tuning_storage_key': tuning_storage_key,
+            'experiment_id': experiment_id,
+            'message': f'Hyperparameter tuning code generated for {len(top_models)} models'
+        }
+
+        return jsonify(convert_to_serializable(response_data)), 200
+
+    except Exception as e:
+        logger.error(f"Failed to generate hyperparameter tuning code: {str(e)}")
+        return jsonify({
+            'error': f'Failed to generate hyperparameter tuning code: {str(e)}'
+        }), 500
+
+@api_bp.route('/execute-hyperparameter-tuning', methods=['POST'])
+def execute_hyperparameter_tuning():
+    """Execute hyperparameter tuning code in E2B sandbox"""
+    try:
+        data = request.get_json()
+
+        # Required parameters
+        tuning_storage_key = data.get('tuning_storage_key')
+        cleaned_data_key = data.get('cleaned_data_key', 'cleaned_data.csv')
+        experiment_id = data.get('experiment_id')
+
+        if not tuning_storage_key:
+            return jsonify({
+                'error': 'Missing required parameter: tuning_storage_key'
+            }), 400
+
+        logger.info(f"Executing hyperparameter tuning code: {tuning_storage_key}")
+
+        # Initialize services
+        storage_service = LocalStorageService()
+        e2b_service = E2BService()
+
+        # Get the tuning code file path
+        tuning_code_path = os.path.join(storage_service.storage_root, tuning_storage_key)
+
+        if not os.path.exists(tuning_code_path):
+            return jsonify({
+                'error': f'Hyperparameter tuning code not found: {tuning_storage_key}'
+            }), 404
+
+        # Read the tuning code
+        with open(tuning_code_path, 'r', encoding='utf-8') as f:
+            tuning_code = f.read()
+
+        # Find the most recent cleaned data file if cleaned_data_key is generic
+        if cleaned_data_key == 'cleaned_data.csv':
+            # Look for the most recent processed cleaned file
+            processed_files = []
+            processed_dir = os.path.join(storage_service.storage_root, 'processed')
+            if os.path.exists(processed_dir):
+                for file in os.listdir(processed_dir):
+                    if 'cleaned' in file and file.endswith('.csv'):
+                        file_path = os.path.join(processed_dir, file)
+                        processed_files.append((file_path, os.path.getmtime(file_path)))
+
+                if processed_files:
+                    # Get the most recent cleaned file
+                    cleaned_data_path = max(processed_files, key=lambda x: x[1])[0]
+                    logger.info(f"Using most recent cleaned data file: {cleaned_data_path}")
+                else:
+                    return jsonify({
+                        'error': 'No cleaned data files found in processed directory'
+                    }), 404
+            else:
+                return jsonify({
+                    'error': 'Processed directory not found'
+                }), 404
+        else:
+            # Use the specific cleaned data key provided
+            cleaned_data_path = os.path.join(storage_service.storage_root, cleaned_data_key)
+            if not os.path.exists(cleaned_data_path):
+                return jsonify({
+                    'error': f'Cleaned data file not found: {cleaned_data_key}'
+                }), 404
+
+        logger.info("Starting hyperparameter tuning execution in E2B sandbox")
+
+        # Execute tuning code in E2B
+        execution_result = e2b_service.execute_hyperparameter_tuning(
+            tuning_code=tuning_code,
+            data_file_path=cleaned_data_path,
+            experiment_id=experiment_id
+        )
+
+        # Process the execution results
+        tuning_summary = {
+            'execution_successful': execution_result['success'],
+            'execution_time': execution_result.get('execution_time', 0),
+            'tuning_results': execution_result.get('tuning_results', {}),
+            'improvements': execution_result.get('improvements', {}),
+            'tuned_models_created': execution_result.get('files_created', []),
+            'execution_log': execution_result.get('stdout', ''),
+            'errors': execution_result.get('stderr', '')
+        }
+
+        # If successful, try to load and return the detailed results
+        if execution_result['success']:
+            try:
+                # Try to get the tuning results JSON from E2B
+                results_content = execution_result.get('tuning_results_content')
+                if results_content:
+                    tuning_summary['detailed_results'] = json.loads(results_content)
+            except Exception as e:
+                logger.warning(f"Could not parse detailed tuning results: {e}")
+
+        response_data = {
+            'tuning_summary': tuning_summary,
+            'execution_status': 'completed' if execution_result['success'] else 'failed',
+            'tuning_storage_key': tuning_storage_key,
+            'experiment_id': experiment_id,
+            'message': 'Hyperparameter tuning executed successfully' if execution_result['success']
+                      else 'Hyperparameter tuning execution failed'
+        }
+
+        status_code = 200 if execution_result['success'] else 400
+        return jsonify(convert_to_serializable(response_data)), status_code
+
+    except Exception as e:
+        logger.error(f"Failed to execute hyperparameter tuning: {str(e)}")
+        return jsonify({
+            'error': f'Failed to execute hyperparameter tuning: {str(e)}'
+        }), 500
+
+@api_bp.route('/download-model/<model_name>', methods=['GET'])
+def download_model(model_name):
+    """Download a trained model file"""
+    try:
+        # Initialize storage service
+        storage_service = LocalStorageService()
+
+        # Construct model file path (try both baseline and tuned models)
+        possible_files = [
+            f"models/{model_name}_tuned_model.pkl",  # Try tuned model first
+            f"models/{model_name}_model.pkl"          # Fallback to baseline model
+        ]
+
+        model_file_path = None
+        for file_path in possible_files:
+            full_path = os.path.join(storage_service.storage_root, file_path)
+            if os.path.exists(full_path):
+                model_file_path = full_path
+                storage_key = file_path
+                break
+
+        if not model_file_path:
+            return jsonify({
+                'error': f'Model file not found for {model_name}. Available models: {possible_files}'
+            }), 404
+
+        logger.info(f"Downloading model: {model_name} from {storage_key}")
+
+        # Generate download URL/response
+        try:
+            # For local storage, we'll send the file directly
+            from flask import send_file
+            return send_file(
+                model_file_path,
+                as_attachment=True,
+                download_name=f"{model_name}_model.pkl",
+                mimetype='application/octet-stream'
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to send model file: {e}")
+            return jsonify({
+                'error': f'Failed to download model: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        logger.error(f"Failed to download model {model_name}: {str(e)}")
+        return jsonify({
+            'error': f'Failed to download model: {str(e)}'
+        }), 500
 
 def _get_evaluation_metrics(task_type):
     """Get evaluation metrics based on task type"""

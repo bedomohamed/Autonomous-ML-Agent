@@ -39,8 +39,11 @@ class E2BService:
                 start_time = time.time()
 
                 # Prepare the user code by replacing file paths and ensuring proper indentation
-                processed_code = code.replace("'input_data.csv'", "'uploaded_data.csv'")
-                processed_code = processed_code.replace('"input_data.csv"', '"uploaded_data.csv"')
+                # Replace any references to the original file path with the sandbox file
+                import re
+                # Extract the original file path from the code
+                file_path_pattern = r"['\"](?:uploads/)?[^'\"]*\.csv['\"]"
+                processed_code = re.sub(file_path_pattern, "'uploaded_data.csv'", code)
 
                 # Prepare the full code with minimal overhead
                 full_code = f"""
@@ -218,10 +221,29 @@ print("Preprocessing completed")
                 execution_log = []
                 start_time = time.time()
 
+                # Install required packages first
+                install_code = """
+import subprocess
+import sys
+
+# Install XGBoost and other required packages
+packages = ['xgboost', 'scikit-learn', 'pandas', 'numpy']
+for package in packages:
+    try:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package, '--quiet'],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"Installed {package}")
+    except Exception as e:
+        print(f"Failed to install {package}: {e}")
+"""
+                sandbox.run_code(install_code)
+
                 # Prepare the full code with imports and data loading
                 full_code = f"""
 import pandas as pd
 import numpy as np
+import pickle
+import json
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -289,13 +311,68 @@ if 'results' in locals() or 'results' in globals():
                 except:
                     pass
 
+                # Initialize parsed results
+                parsed_model_results = []
+
                 try:
-                    # Look for results JSON file
-                    results_content = sandbox.files.read('model_results.json')
-                    results_file = json.loads(results_content.decode('utf-8'))
-                    logger.info("Model results successfully loaded")
+                    # Look for results JSON file FIRST (most reliable)
+                    logger.info("Attempting to read model_results.json from storage/models/")
+                    results_content = sandbox.files.read('storage/models/model_results.json')
+                    # Handle both string and bytes content
+                    if isinstance(results_content, bytes):
+                        results_content = results_content.decode('utf-8')
+                    results_file = json.loads(results_content)
+                    logger.info(f"Model results successfully loaded from JSON file: {results_file}")
+
+                    # Convert results_file dict to the expected array format
+                    if results_file and isinstance(results_file, dict):
+                        for model_name, metrics in results_file.items():
+                            # Use JSON names directly with minimal formatting
+                            clean_name = model_name.replace('_', ' ')
+                            parsed_model_results.append({
+                                'name': clean_name,
+                                'accuracy': metrics.get('accuracy', 0),
+                                'precision': metrics.get('precision', 0),
+                                'recall': metrics.get('recall', 0),
+                                'f1_score': metrics.get('f1_score', 0),
+                                'roc_auc': metrics.get('roc_auc', 0),
+                                'training_time': 0
+                            })
+                        logger.info(f"Converted {len(parsed_model_results)} model results from JSON file")
                 except Exception as e:
-                    logger.warning(f"Model results file not found: {e}")
+                    logger.warning(f"Model results file not found at storage/models/: {e}")
+                    # Try alternative path
+                    try:
+                        logger.info("Attempting to read model_results.json from root directory")
+                        results_content = sandbox.files.read('model_results.json')
+                        # Handle both string and bytes content
+                        if isinstance(results_content, bytes):
+                            results_content = results_content.decode('utf-8')
+                        results_file = json.loads(results_content)
+                        logger.info(f"Model results loaded from root directory: {results_file}")
+                        if results_file and isinstance(results_file, dict):
+                            parsed_model_results = []
+                            for model_name, metrics in results_file.items():
+                                # Use JSON names directly with minimal formatting
+                                clean_name = model_name.replace('_', ' ')
+                                parsed_model_results.append({
+                                    'name': clean_name,
+                                    'accuracy': metrics.get('accuracy', 0),
+                                    'precision': metrics.get('precision', 0),
+                                    'recall': metrics.get('recall', 0),
+                                    'f1_score': metrics.get('f1_score', 0),
+                                    'roc_auc': metrics.get('roc_auc', 0),
+                                    'training_time': 0
+                                })
+                    except Exception as e2:
+                        logger.warning(f"Alternative model results file not found: {e2}")
+                        # List files to see what's available
+                        try:
+                            list_code = "import os; print('Files in root:', os.listdir('.')); print('Files in storage:', os.listdir('storage') if os.path.exists('storage') else 'No storage dir'); print('Files in storage/models:', os.listdir('storage/models') if os.path.exists('storage/models') else 'No storage/models dir')"
+                            ls_result = sandbox.run_code(list_code)
+                            logger.info(f"Directory listing: {ls_result}")
+                        except Exception as e3:
+                            logger.warning(f"Failed to list directories: {e3}")
 
                 execution_time = time.time() - start_time
 
@@ -307,8 +384,9 @@ if 'results' in locals() or 'results' in globals():
                     'stderr': stderr_output,
                     'model_files': model_files,
                     'results': results_file,
+                    'model_results': parsed_model_results or results_file,  # Use parsed results if JSON file not available
                     'execution_log': execution_log,
-                    'models_trained': len(model_files)
+                    'models_trained': len(parsed_model_results) if parsed_model_results else len(model_files)
                 }
 
             except Exception as exec_error:
@@ -329,6 +407,66 @@ if 'results' in locals() or 'results' in globals():
                 'success': False,
                 'error': f"Training sandbox failed: {str(e)}"
             }
+
+    def _parse_model_results_from_stdout(self, stdout_output):
+        """Parse model results from E2B stdout output"""
+        try:
+            import re
+
+            # Extract stdout array from nested Execution object string
+            model_results = []
+
+            # Handle both direct stdout and nested Execution object format
+            text_to_parse = stdout_output
+
+            # If it's a nested Execution object, extract the stdout array
+            stdout_match = re.search(r'stdout: \[(.*?)\]', stdout_output, re.DOTALL)
+            if stdout_match:
+                # Parse the array content and join strings
+                array_content = stdout_match.group(1)
+                string_matches = re.findall(r'"([^"]*)"', array_content)
+                if string_matches:
+                    # Unescape and join all strings
+                    text_to_parse = ' '.join(
+                        s.replace('\\n', '\n').replace('\\"', '"') for s in string_matches
+                    )
+
+            # Extract model results using regex
+            model_pattern = r'(\w+)\s+(?:Results|Model Performance):\s*({[^}]+})'
+            matches = re.findall(model_pattern, text_to_parse)
+
+            for model_name, results_str in matches:
+                try:
+                    # Clean and parse JSON
+                    clean_results = results_str.replace("'", '"')
+                    model_data = json.loads(clean_results)
+
+                    # Use model names directly with minimal formatting
+                    clean_name = model_name.replace('_', ' ')
+
+                    model_results.append({
+                        'name': clean_name,
+                        'accuracy': model_data.get('accuracy', 0),
+                        'precision': model_data.get('precision', 0),
+                        'recall': model_data.get('recall', 0),
+                        'f1_score': model_data.get('f1_score', 0),
+                        'roc_auc': model_data.get('roc_auc', model_data.get('auc', 0)),
+                        'training_time': 0  # Not available in stdout
+                    })
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Failed to parse results for {model_name}: {e}")
+                    continue
+
+            if model_results:
+                logger.info(f"Successfully parsed {len(model_results)} model results from stdout")
+                return model_results
+            else:
+                logger.warning("No model results found in stdout")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error parsing model results from stdout: {e}")
+            return None
 
     def health_check(self) -> Dict[str, Any]:
         """Check if E2B service is accessible"""
@@ -387,6 +525,228 @@ print(f'sklearn version: {sklearn.__version__}')
                 'status': 'unhealthy',
                 'sandbox_accessible': False,
                 'error': str(e)
+            }
+
+    def execute_hyperparameter_tuning(self, tuning_code: str, data_file_path: str, experiment_id: str = None) -> Dict[str, Any]:
+        """Execute hyperparameter tuning code in E2B sandbox"""
+        execution_id = str(uuid.uuid4())[:8]
+        logger.info(f"Starting hyperparameter tuning execution {execution_id}")
+        start_time = time.time()
+
+        try:
+            # Create sandbox using the E2B v2 API
+            sandbox = Sandbox.create(api_key=self.api_key)
+
+            try:
+                # Upload cleaned data file
+                logger.info("Uploading cleaned data to sandbox")
+                with open(data_file_path, 'rb') as f:
+                    sandbox.files.write('cleaned_data.csv', f.read())
+
+                # Install required dependencies first
+                logger.info("Installing required dependencies in sandbox")
+                install_code = """
+import subprocess
+import sys
+
+# Install required packages
+packages = ['xgboost', 'joblib']
+for package in packages:
+    try:
+        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"Successfully installed {package}")
+    except Exception as e:
+        print(f"Failed to install {package}: {e}")
+
+print("Dependencies installation completed.")
+"""
+
+                # First install dependencies
+                install_result = sandbox.run_code(install_code)
+
+                # Log dependency installation results
+                install_output = ""
+                if hasattr(install_result, 'stdout') and install_result.stdout:
+                    install_output = install_result.stdout
+                elif hasattr(install_result, 'text') and install_result.text:
+                    install_output = install_result.text
+                else:
+                    install_output = str(install_result)
+
+                logger.info(f"Dependencies installed: {install_output[:200]}...")  # Log first 200 chars
+
+                # Then execute the tuning code
+                logger.info("Executing hyperparameter tuning code")
+                result = sandbox.run_code(tuning_code, timeout=900)  # 15 minutes timeout
+
+                # Extract output from various possible result attributes
+                stdout_output = ""
+                stderr_output = ""
+
+                # Try different possible attributes for output
+                if hasattr(result, 'stdout') and result.stdout:
+                    stdout_output = result.stdout
+                elif hasattr(result, 'text') and result.text:
+                    stdout_output = result.text
+                elif hasattr(result, 'output') and result.output:
+                    stdout_output = result.output
+                elif hasattr(result, 'content') and result.content:
+                    stdout_output = result.content
+                else:
+                    stdout_output = str(result)
+
+                # Try to get stderr
+                if hasattr(result, 'stderr') and result.stderr:
+                    stderr_output = result.stderr
+                elif hasattr(result, 'error') and result.error:
+                    stderr_output = result.error
+
+                execution_log = [
+                    {
+                        'type': 'execution_complete',
+                        'status': 'success',
+                        'stdout': stdout_output,
+                        'stderr': stderr_output,
+                        'timestamp': time.time()
+                    }
+                ]
+
+                # Check for tuning results file
+                tuning_results = {}
+                tuning_results_content = None
+                try:
+                    tuning_results_content = sandbox.files.read('storage/models/hyperparameter_tuning_results.json')
+                    if isinstance(tuning_results_content, bytes):
+                        tuning_results_content = tuning_results_content.decode('utf-8')
+                    tuning_results = json.loads(tuning_results_content)
+                    logger.info("Successfully loaded tuning results")
+                except Exception as e:
+                    logger.warning(f"Could not load tuning results: {e}")
+
+                # Check for comparison report
+                comparison_report = {}
+                try:
+                    report_content = sandbox.files.read('storage/models/tuning_comparison_report.json')
+                    if isinstance(report_content, bytes):
+                        report_content = report_content.decode('utf-8')
+                    comparison_report = json.loads(report_content)
+                    logger.info("Successfully loaded comparison report")
+                except Exception as e:
+                    logger.warning(f"Could not load comparison report: {e}")
+
+                # List and download tuned model files from sandbox
+                files_created = []
+                try:
+                    # More robust file listing with better error handling
+                    list_code = """
+import os
+import json
+try:
+    if os.path.exists('storage/models'):
+        files = [f for f in os.listdir('storage/models') if f.endswith('_tuned_model.pkl')]
+        print(json.dumps(files))
+    else:
+        print(json.dumps([]))
+except Exception as e:
+    print(json.dumps([]))
+"""
+                    ls_result = sandbox.run_code(list_code)
+
+                    files_list = []
+                    result_text = ""
+                    if hasattr(ls_result, 'text') and ls_result.text.strip():
+                        result_text = ls_result.text.strip()
+                    elif hasattr(ls_result, 'stdout') and ls_result.stdout.strip():
+                        result_text = ls_result.stdout.strip()
+
+                    # Parse JSON response
+                    if result_text:
+                        try:
+                            files_list = json.loads(result_text)
+                        except:
+                            # Fallback to old method
+                            if result_text.startswith('['):
+                                files_list = eval(result_text)
+
+                    # Download each tuned model file from sandbox to local storage
+                    import os
+                    import json
+                    local_storage_path = os.path.join(os.getcwd(), 'storage', 'models')
+                    os.makedirs(local_storage_path, exist_ok=True)
+
+                    for file_name in files_list:
+                        try:
+                            # Read file from sandbox
+                            file_content = sandbox.files.read(f'storage/models/{file_name}')
+
+                            # Write to local storage
+                            local_file_path = os.path.join(local_storage_path, file_name)
+                            with open(local_file_path, 'wb') as f:
+                                f.write(file_content)
+
+                            files_created.append(file_name)
+                            logger.info(f"Downloaded tuned model: {file_name}")
+
+                        except Exception as download_error:
+                            logger.warning(f"Failed to download {file_name}: {download_error}")
+
+                    # Also try to download the scaler if it was created
+                    try:
+                        scaler_content = sandbox.files.read('storage/models/scaler.pkl')
+                        local_scaler_path = os.path.join(local_storage_path, 'scaler.pkl')
+                        with open(local_scaler_path, 'wb') as f:
+                            f.write(scaler_content)
+                        logger.info("Downloaded scaler.pkl")
+                    except:
+                        pass  # Scaler might already exist
+
+                except Exception as e:
+                    logger.warning(f"Could not list or download created files: {e}")
+
+                execution_time = time.time() - start_time
+
+                # Calculate improvements if available
+                improvements = {}
+                if comparison_report and 'overall_improvement' in comparison_report:
+                    improvements = comparison_report['overall_improvement']
+
+                return {
+                    'success': True,
+                    'execution_id': execution_id,
+                    'execution_time': round(execution_time, 2),
+                    'stdout': stdout_output,
+                    'stderr': stderr_output,
+                    'tuning_results': tuning_results,
+                    'tuning_results_content': tuning_results_content,
+                    'comparison_report': comparison_report,
+                    'improvements': improvements,
+                    'files_created': files_created,
+                    'execution_log': execution_log
+                }
+
+            except Exception as exec_error:
+                logger.error(f"Hyperparameter tuning execution failed: {exec_error}")
+                return {
+                    'success': False,
+                    'execution_id': execution_id,
+                    'error': str(exec_error),
+                    'execution_time': time.time() - start_time,
+                    'stdout': "",
+                    'stderr': str(exec_error)
+                }
+
+            finally:
+                # Sandbox cleanup is automatic in E2B v2
+                pass
+
+        except Exception as e:
+            logger.error(f"Failed to create sandbox for hyperparameter tuning: {e}")
+            return {
+                'success': False,
+                'execution_id': execution_id,
+                'error': str(e),
+                'execution_time': time.time() - start_time
             }
 
     def get_sandbox_info(self) -> Dict[str, Any]:

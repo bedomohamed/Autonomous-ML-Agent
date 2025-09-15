@@ -9,6 +9,17 @@ interface CSVPreviewProps {
 }
 
 export default function CSVPreview({ data }: CSVPreviewProps) {
+  if (!data || !data.preview) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="flex items-center space-x-2 text-red-600">
+          <AlertCircle size={20} />
+          <span className="text-sm">No preview data available</span>
+        </div>
+      </div>
+    )
+  }
+
   const hasNulls = data.preview.some(row =>
     data.columns.some(col => row[col] === null || row[col] === undefined)
   )

@@ -39,21 +39,13 @@ const PIPELINE_STEPS = [
   {
     id: 1,
     name: 'Upload',
-    title: 'Upload Dataset',
-    description: 'Upload your CSV file',
+    title: 'Upload & Target',
+    description: 'Upload CSV and choose target',
     icon: Upload,
     component: 'FileUpload'
   },
   {
     id: 2,
-    name: 'Target',
-    title: 'Select Target',
-    description: 'Choose target column',
-    icon: Target,
-    component: 'ColumnSelector'
-  },
-  {
-    id: 3,
     name: 'Analyze',
     title: 'Data Analysis',
     description: 'Comprehensive analysis',
@@ -61,7 +53,7 @@ const PIPELINE_STEPS = [
     component: 'DataAnalysis'
   },
   {
-    id: 4,
+    id: 3,
     name: 'Preprocess',
     title: 'Data Preprocessing',
     description: 'Clean and prepare data',
@@ -69,7 +61,7 @@ const PIPELINE_STEPS = [
     component: 'PreprocessingStep'
   },
   {
-    id: 5,
+    id: 4,
     name: 'Train',
     title: 'Model Training',
     description: 'Train ML models',
@@ -77,7 +69,7 @@ const PIPELINE_STEPS = [
     component: 'ModelTraining'
   },
   {
-    id: 6,
+    id: 5,
     name: 'Results',
     title: 'Results',
     description: 'View model performance',
@@ -160,16 +152,15 @@ export default function MLPipelineWizard() {
       ...prev,
       fileData
     }))
-    updateStepState(1, 'completed')
-    nextStep()
-  }, [updateStepState, nextStep])
+    // Don't auto-advance, wait for target selection
+  }, [])
 
   const handleTargetSelection = useCallback((targetColumn: string) => {
     setPipelineState(prev => ({
       ...prev,
       targetColumn
     }))
-    updateStepState(2, 'completed')
+    updateStepState(1, 'completed')
     nextStep()
   }, [updateStepState, nextStep])
 
@@ -179,7 +170,7 @@ export default function MLPipelineWizard() {
       analysisData,
       experimentId: analysisData.experiment_id
     }))
-    updateStepState(3, 'completed')
+    updateStepState(2, 'completed')
     nextStep()
   }, [updateStepState, nextStep])
 
@@ -188,7 +179,7 @@ export default function MLPipelineWizard() {
       ...prev,
       preprocessingData
     }))
-    updateStepState(4, 'completed')
+    updateStepState(3, 'completed')
     nextStep()
   }, [updateStepState, nextStep])
 
@@ -197,16 +188,23 @@ export default function MLPipelineWizard() {
       ...prev,
       trainingData
     }))
-    updateStepState(5, 'completed')
+    updateStepState(4, 'completed')
     nextStep()
   }, [updateStepState, nextStep])
 
   const handleResultsComplete = useCallback((resultsData: any) => {
-    setPipelineState(prev => ({
-      ...prev,
-      resultsData
-    }))
-    updateStepState(6, 'completed')
+    console.log('handleResultsComplete called with:', resultsData)
+    setPipelineState(prev => {
+      console.log('Previous pipeline state:', prev)
+      const newState = {
+        ...prev,
+        trainingData: resultsData, // Update trainingData with the new results
+        resultsData // Also keep resultsData for backward compatibility
+      }
+      console.log('New pipeline state:', newState)
+      return newState
+    })
+    updateStepState(5, 'completed')
   }, [updateStepState])
 
   const currentStepData = PIPELINE_STEPS.find(step => step.id === pipelineState.currentStep)
@@ -239,18 +237,16 @@ export default function MLPipelineWizard() {
 
     switch (currentStep) {
       case 1:
-        return <FileUpload onUploadSuccess={handleFileUpload} />
+        return (
+          <FileUpload
+            onUploadSuccess={handleFileUpload}
+            fileData={fileData}
+            targetColumn={targetColumn}
+            onTargetSelect={handleTargetSelection}
+          />
+        )
 
       case 2:
-        return fileData ? (
-          <ColumnSelector
-            columns={fileData.columns}
-            selectedColumn={targetColumn}
-            onColumnSelect={handleTargetSelection}
-          />
-        ) : null
-
-      case 3:
         return fileData && targetColumn ? (
           <DataAnalysis
             storageKey={fileData.storage_key}
@@ -259,7 +255,7 @@ export default function MLPipelineWizard() {
           />
         ) : null
 
-      case 4:
+      case 3:
         return analysisData ? (
           <PreprocessingStep
             analysisData={analysisData}
@@ -267,7 +263,7 @@ export default function MLPipelineWizard() {
           />
         ) : null
 
-      case 5:
+      case 4:
         return preprocessingData ? (
           <ModelTraining
             preprocessingData={preprocessingData}
@@ -276,7 +272,7 @@ export default function MLPipelineWizard() {
           />
         ) : null
 
-      case 6:
+      case 5:
         return trainingData ? (
           <ResultsLeaderboard
             trainingData={trainingData}

@@ -33,7 +33,7 @@ Dataset Information:
 - Target Column: {dataset_info.get('target_column', 'target')}
 - Shape: {dataset_info.get('shape', 'unknown')}
 
-CRITICAL REQUIREMENTS:
+🚨 CRITICAL REQUIREMENTS - CODE WILL FAIL IF THESE ARE NOT FOLLOWED:
 1. Generate COMPLETE, EXECUTABLE Python code only
 2. Include ALL necessary imports at the top
 3. Use MODERN scikit-learn API (version 1.0+):
@@ -43,11 +43,12 @@ CRITICAL REQUIREMENTS:
 4. Add comprehensive comments explaining each step
 5. Handle edge cases and errors gracefully with try-catch blocks
 6. Use print statements to show progress and results
-7. Save the final cleaned dataset as 'cleaned_data.csv' using: cleaned_df.to_csv('cleaned_data.csv', index=False)
+7. 🔥 MANDATORY: Save the final cleaned dataset as 'cleaned_data.csv' using: cleaned_df.to_csv('cleaned_data.csv', index=False)
 8. Assign the final result to variable 'cleaned_df'
-9. Add data validation checks before and after processing
-10. MUST work with actual dataset - detect column types automatically, don't hardcode column names
-11. Handle any dataset structure - analyze columns automatically
+9. 🔥 CRITICAL: Your code MUST include the line: cleaned_df.to_csv('cleaned_data.csv', index=False)
+10. Add data validation checks before and after processing
+11. MUST work with actual dataset - detect column types automatically, don't hardcode column names
+12. Handle any dataset structure - analyze columns automatically
 
 MODERN SKLEARN SYNTAX EXAMPLES:
 - OneHotEncoder(sparse_output=False, drop='first')
@@ -55,14 +56,36 @@ MODERN SKLEARN SYNTAX EXAMPLES:
 - StandardScaler() (unchanged)
 - Use ColumnTransformer with feature_names_out parameter
 
-CODE STRUCTURE:
-- Load data from 'input_data.csv'
-- Automatically identify numeric and categorical columns
-- IMPORTANT: Drop high-cardinality categorical columns (>50 unique values) like names, IDs, or unique identifiers
-- Only apply one-hot encoding to low-cardinality categorical columns (<= 10 unique values)
-- Create preprocessing pipeline that works for ANY dataset structure
-- Exclude the target column '{dataset_info.get('target_column', 'target')}' from features
-- Save final cleaned dataset as 'cleaned_data.csv'
+CODE STRUCTURE (FOLLOW THIS EXACT ORDER):
+1. Load data from 'input_data.csv'
+2. Print original shape and column info
+3. FIRST: Drop columns that won't be used (IDs, names, high-cardinality columns)
+4. AFTER dropping: Identify numeric and categorical columns from REMAINING columns only
+5. Create preprocessing pipeline using ONLY the remaining columns after dropping
+6. Exclude the target column '{dataset_info.get('target_column', 'target')}' from features
+7. Apply preprocessing to the cleaned dataset
+8. Print final shape before saving
+9. 🔥 Save final cleaned dataset as 'cleaned_data.csv'
+10. 🔥 Print confirmation that file was saved
+
+⚠️ CRITICAL ORDERING:
+- Drop unwanted columns FIRST
+- Define numeric/categorical column lists AFTER dropping
+- Create preprocessor using ONLY remaining columns
+- This prevents "column not found" errors
+
+EXAMPLE FLOW:
+```python
+# WRONG - causes "column not found" errors:
+numeric_cols = ['RowNumber', 'Age', 'Balance']  # includes RowNumber
+df = df.drop(['RowNumber'], axis=1)  # RowNumber no longer exists
+preprocessor = ColumnTransformer([('num', StandardScaler(), numeric_cols)])  # ERROR!
+
+# CORRECT - identify columns AFTER dropping:
+df = df.drop(['RowNumber'], axis=1)  # drop first
+numeric_cols = ['Age', 'Balance']  # only remaining columns
+preprocessor = ColumnTransformer([('num', StandardScaler(), numeric_cols)])  # works!
+```
 
 CRITICAL: Do NOT one-hot encode columns like:
 - Names (FirstName, LastName, Surname, etc.)
@@ -77,12 +100,29 @@ IMPORTANT: DO NOT hardcode column names. Use dynamic analysis:
 - Use pattern matching to identify ID/name columns (e.g., contains 'id', 'name', 'surname')
 - Analyze cardinality programmatically
 
+🚨 DEBUGGING REQUIREMENTS:
+- Print the dataframe shape before and after each major transformation
+- Print column names and their data types
+- Print which columns are being dropped and why
+- Print which columns are being encoded
+- Use try-catch blocks with detailed error messages
+- Print success messages for each major step
+
+🔥 FINAL CRITICAL REMINDER: Your code MUST end with these EXACT lines:
+print(f"Final cleaned dataframe shape: {{cleaned_df.shape}}")
+print(f"Final columns: {{list(cleaned_df.columns)}}")
+cleaned_df.to_csv('cleaned_data.csv', index=False)
+print("✅ Cleaned dataset saved to 'cleaned_data.csv'")
+import os
+print(f"✅ File exists: {{os.path.exists('cleaned_data.csv')}}")
+print(f"✅ File size: {{os.path.getsize('cleaned_data.csv') if os.path.exists('cleaned_data.csv') else 'File not found'}}")
+
 RESPONSE FORMAT:
 - Return ONLY executable Python code
 - NO markdown code blocks (```python)
 - NO explanations, comments, or text before/after the code
 - Start directly with import statements
-- End with the last line of actual Python code
+- End with the file verification lines above
             """
 
             response = self.client.messages.create(
@@ -328,59 +368,52 @@ You are a machine learning expert. Create comprehensive model training code for 
 - **Task Type**: {task_type}
 - **Dataset Shape**: {shape.get('rows', 'unknown')} rows × {shape.get('columns', 'unknown')} columns
 
-## Requirements:
+## CRITICAL REQUIREMENTS:
+
+### File Organization:
+1. Create 'storage/models' directory if it doesn't exist: `os.makedirs('storage/models', exist_ok=True)`
+2. Save ALL model files (.pkl) in the 'storage/models/' directory
+3. Save results JSON in 'storage/models/' directory
+4. Save scaler in 'storage/models/' directory
+
+### Data Handling:
 1. Load cleaned data from 'cleaned_data.csv'
-2. Split data: 80% train, 15% test, 5% validation (use stratified sampling for classification)
-3. Train all 4 models with proper random seeds
-4. Evaluate performance on test and validation sets
-5. Save models as .pkl files
-6. Save results as JSON
-7. Print progress and results
+2. CRITICAL: The target column is named '{target_column}' - DO NOT use 'target' as the column name
+3. Use X = data.drop('{target_column}', axis=1) and y = data['{target_column}']
+4. Check if '{target_column}' column exists before using it
+5. Print dataset shape and column names for debugging
 
-## Models to Train:
+### Data Splitting:
+1. Split: 70% train, 15% test, 15% validation
+2. Use stratified sampling for classification: `stratify=y`
+3. Print split sizes for verification
+4. Scale features using StandardScaler and save the scaler
+
+### Model Training:
 {model_init.strip()}
 
-## Expected Code Structure:
-```python
-import pandas as pd
-import numpy as np
-{model_imports.strip()}
-from sklearn.model_selection import train_test_split
-import pickle
-import json
+### Error Handling:
+1. Use try-except blocks for all major operations
+2. Check if files exist before loading
+3. Validate data shapes and types
+4. Handle missing columns gracefully
 
-# Load cleaned data
-df = pd.read_csv('cleaned_data.csv')
+### Output Requirements:
+1. Print detailed progress for each step
+2. Show model performance metrics
+3. Save each model with descriptive filename: 'storage/models/{{model_name}}_model.pkl'
+4. Save scaler as 'storage/models/scaler.pkl'
+5. Save results as 'storage/models/model_results.json'
+6. Save best model info as 'storage/models/best_model_info.json'
 
-# Prepare features and target
-X = df.drop('{target_column}', axis=1)
-y = df['{target_column}']
+## RESPONSE FORMAT:
+- Return ONLY executable Python code
+- NO markdown code blocks (```python)
+- NO explanations, comments, or text before/after the code
+- Start directly with import statements
+- End with the last line of actual Python code
 
-# Split data (80% train, 15% test, 5% validation)
-# Use stratify=y for classification tasks
-
-# Initialize models
-{model_init.strip()}
-
-# Training loop with progress tracking
-results = {{}}
-for name, model in models.items():
-    print(f"Training {{name}}...")
-
-    # Train model
-    # Make predictions
-    # Evaluate performance
-    # Save model
-    # Store results
-
-# Save results
-with open('model_results.json', 'w') as f:
-    json.dump(results, f, indent=2)
-
-print("Model training completed!")
-```
-
-Generate COMPLETE, EXECUTABLE Python code. Include ALL imports and error handling.
+Generate COMPLETE, EXECUTABLE Python code with proper error handling and file organization.
         """
 
     def _build_tuning_prompt(self, baseline_results: Dict[str, Any], top_models: list) -> str:
@@ -394,34 +427,77 @@ You are a machine learning optimization expert. Create hyperparameter tuning cod
 ## Baseline Results:
 {json.dumps(baseline_results, indent=2)[:500]}...
 
-## Requirements:
-1. Load cleaned data and best baseline models
-2. Use GridSearchCV with 5-fold cross-validation
-3. Define comprehensive parameter grids for each model
-4. Track improvement over baseline
-5. Save tuned models with best parameters
-6. Generate comparison report
+## CRITICAL REQUIREMENTS:
 
-## Parameter Grids:
+### File Organization:
+1. Create 'storage/models' directory if it doesn't exist: `os.makedirs('storage/models', exist_ok=True)`
+2. Load baseline models from 'storage/models/' directory
+3. Save all tuned models in 'storage/models/' directory
+4. Save tuning results as 'storage/models/hyperparameter_tuning_results.json'
+5. Save comparison report as 'storage/models/tuning_comparison_report.json'
 
-### XGBoost:
-- n_estimators: [100, 200, 300]
+### Data and Model Loading:
+1. Load cleaned data from 'cleaned_data.csv' with target column 'Exited' (NOT 'target')
+2. Load baseline models from 'storage/models/{{model_name}}_model.pkl'
+3. Load scaler from 'storage/models/scaler.pkl' if it exists
+4. IMPORTANT: Use 'Exited' as the target column name, not 'target'
+
+### Hyperparameter Tuning:
+1. Use GridSearchCV with 3-fold cross-validation and scoring='f1_weighted' for classification
+2. Use comprehensive parameter grids (provided below)
+3. Track improvement over baseline performance
+4. Print progress and intermediate results
+5. Use n_jobs=1 in GridSearchCV to avoid memory issues
+6. Add timeout protection and early stopping if needed
+7. Split data properly: 70% train, 30% test (use same random_state=42 for consistency)
+8. Scale features using StandardScaler if scaler doesn't exist
+
+### Parameter Grids (Optimized for Speed):
+
+#### XGBoost:
+- n_estimators: [100, 200]
 - max_depth: [3, 5, 7]
-- learning_rate: [0.01, 0.1, 0.2]
-- subsample: [0.8, 0.9, 1.0]
+- learning_rate: [0.1, 0.2]
 
-### Random Forest:
-- n_estimators: [100, 200, 300]
-- max_depth: [None, 10, 20]
-- min_samples_split: [2, 5, 10]
-- min_samples_leaf: [1, 2, 4]
+#### Random Forest:
+- n_estimators: [100, 200]
+- max_depth: [10, 20]
+- min_samples_split: [2, 5]
 
-### Decision Tree:
-- max_depth: [5, 10, 15, None]
-- min_samples_split: [2, 5, 10]
-- min_samples_leaf: [1, 2, 5]
+#### Decision Tree:
+- max_depth: [10, 15, 20]
+- min_samples_split: [2, 5]
+- min_samples_leaf: [1, 2]
 
-Generate COMPLETE, EXECUTABLE Python code with GridSearchCV implementation.
+### Baseline Results (for comparison):
+{json.dumps(baseline_results, indent=2)}
+
+### Output Requirements:
+1. Save tuned models with descriptive filenames: 'storage/models/{{model_name}}_tuned_model.pkl'
+2. Print detailed comparison between baseline and tuned models
+3. Save comprehensive results including best parameters and performance improvements
+4. Generate summary report with recommendations
+5. DO NOT try to load baseline_results.json - the baseline results are provided above
+
+## CRITICAL: Dependencies Installation
+MUST START with dependency installation BEFORE any other imports:
+
+EXACT code structure required:
+1. First: import subprocess, sys
+2. Second: install packages with pip
+3. Third: import all other packages (sklearn, xgboost, etc.)
+4. Fourth: import time and add progress tracking
+5. Fifth: actual hyperparameter tuning code with time monitoring
+
+## RESPONSE FORMAT:
+- Return ONLY executable Python code
+- NO markdown code blocks (```python)
+- NO explanations, comments, or text before/after the code
+- MUST start with: import subprocess, sys
+- MUST install dependencies BEFORE importing xgboost
+- End with the last line of actual Python code
+
+Generate COMPLETE, EXECUTABLE Python code with dependency installation and proper error handling.
         """
 
     def _extract_models_from_code(self, code: str) -> list:
