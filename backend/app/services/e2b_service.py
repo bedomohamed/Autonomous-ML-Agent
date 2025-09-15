@@ -336,7 +336,7 @@ if 'results' in locals() or 'results' in globals():
                                 'recall': metrics.get('recall', 0),
                                 'f1_score': metrics.get('f1_score', 0),
                                 'roc_auc': metrics.get('roc_auc', 0),
-                                'training_time': 0
+                                'training_time': metrics.get('training_time', 0)
                             })
                         logger.info(f"Converted {len(parsed_model_results)} model results from JSON file")
                 except Exception as e:
@@ -362,7 +362,7 @@ if 'results' in locals() or 'results' in globals():
                                     'recall': metrics.get('recall', 0),
                                     'f1_score': metrics.get('f1_score', 0),
                                     'roc_auc': metrics.get('roc_auc', 0),
-                                    'training_time': 0
+                                    'training_time': metrics.get('training_time', 0)
                                 })
                     except Exception as e2:
                         logger.warning(f"Alternative model results file not found: {e2}")

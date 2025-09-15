@@ -329,6 +329,9 @@ Provide a concise 2-3 sentence explanation focusing on the main preprocessing st
 
         if task_type == 'classification':
             model_imports = """
+import time
+import json
+import os
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.naive_bayes import GaussianNB
@@ -345,6 +348,9 @@ models = {
             """
         else:
             model_imports = """
+import time
+import json
+import os
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 from xgboost import XGBRegressor
@@ -398,13 +404,42 @@ You are a machine learning expert. Create comprehensive model training code for 
 3. Validate data shapes and types
 4. Handle missing columns gracefully
 
+### Model Training & Timing:
+1. CRITICAL: Track training time for each model using time.time()
+2. Train each model separately and measure individual training times
+3. Use this EXACT pattern for each model:
+   ```
+   start_time = time.time()
+   model.fit(X_train_scaled, y_train)
+   end_time = time.time()
+   training_time = end_time - start_time
+   ```
+4. Store training_time in results dictionary for each model
+
 ### Output Requirements:
 1. Print detailed progress for each step
 2. Show model performance metrics
 3. Save each model with descriptive filename: 'storage/models/{{model_name}}_model.pkl'
 4. Save scaler as 'storage/models/scaler.pkl'
-5. Save results as 'storage/models/model_results.json'
+5. CRITICAL: Save results as 'storage/models/model_results.json' with EXACT format:
+   {{
+     "XGBoost": {{
+       "accuracy": 0.85,
+       "precision": 0.82,
+       "recall": 0.88,
+       "f1_score": 0.85,
+       "training_time": 12.5
+     }},
+     "Random_Forest": {{
+       "accuracy": 0.83,
+       "precision": 0.80,
+       "recall": 0.86,
+       "f1_score": 0.83,
+       "training_time": 8.2
+     }}
+   }}
 6. Save best model info as 'storage/models/best_model_info.json'
+7. MANDATORY: Include 'training_time' field for each model in the JSON results
 
 ## RESPONSE FORMAT:
 - Return ONLY executable Python code

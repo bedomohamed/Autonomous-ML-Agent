@@ -42,48 +42,62 @@ export default function ResultsLeaderboard({
   onResultsComplete
 }: ResultsLeaderboardProps) {
   const [selectedMetric, setSelectedMetric] = useState<'accuracy' | 'f1_score' | 'training_time'>('accuracy')
+  const [modelResults, setModelResults] = useState<ModelRanking[]>([])
+
+  // Update model results when trainingData changes
+  useEffect(() => {
+    const parsedResults = parseModelResults()
+    setModelResults(parsedResults)
+  }, [trainingData])
 
   // Parse real results from trainingData
   const parseModelResults = (): ModelRanking[] => {
     const results: ModelRanking[] = []
 
     // First, check for hyperparameter tuning results (baseline + tuned)
-    if (trainingData?.tuning_execution?.tuning_summary?.detailed_results) {
-      console.log('Found hyperparameter tuning data - processing both baseline and tuned...')
-      const tunedResults = trainingData.tuning_execution.tuning_summary.detailed_results
+    // Try multiple possible paths for the tuning data
+    const tunedResults = trainingData?.tuning_execution?.tuning_summary?.detailed_results ||
+                        trainingData?.tuning_summary?.detailed_results ||
+                        trainingData?.detailed_results ||
+                        trainingData?.tuning_data?.detailed_results ||
+                        trainingData?.hyperparameter_results?.detailed_results
 
+    if (tunedResults) {
       Object.entries(tunedResults).forEach(([modelName, data]: [string, any]) => {
+
         if (data && !data.error) {
           // Add baseline model if exists
-          if (data.baseline_results) {
+          const baseline = data.baseline_results || data.baseline
+          if (baseline) {
             results.push({
               rank: results.length + 1,
               name: `${modelName} (Baseline)`,
-              accuracy: data.baseline_results.accuracy || 0,
-              precision: data.baseline_results.precision || 0,
-              recall: data.baseline_results.recall || 0,
-              f1_score: data.baseline_results.f1_score || 0,
-              training_time: data.baseline_results.training_time || 0,
+              accuracy: baseline.accuracy || 0,
+              precision: baseline.precision || 0,
+              recall: baseline.recall || 0,
+              f1_score: baseline.f1_score || 0,
+              training_time: baseline.training_time || 0,
               improvement: 'Original',
               badge: 'Baseline'
             })
           }
 
           // Add tuned model if exists
-          if (data.tuned_results) {
-            const baselineF1 = data.baseline_results?.f1_score || 0
-            const tunedF1 = data.tuned_results?.f1_score || 0
+          const tuned = data.tuned_results || data.tuned
+          if (tuned) {
+            const baselineF1 = baseline?.f1_score || 0
+            const tunedF1 = tuned?.f1_score || 0
             const improvementValue = tunedF1 - baselineF1
             const improvementText = `${improvementValue > 0 ? '+' : ''}${(improvementValue * 100).toFixed(1)}%`
 
             results.push({
               rank: results.length + 1,
               name: `${modelName} (Tuned)`,
-              accuracy: data.tuned_results.accuracy || 0,
-              precision: data.tuned_results.precision || 0,
-              recall: data.tuned_results.recall || 0,
-              f1_score: data.tuned_results.f1_score || 0,
-              training_time: data.tuned_results.training_time || 0,
+              accuracy: tuned.accuracy || 0,
+              precision: tuned.precision || 0,
+              recall: tuned.recall || 0,
+              f1_score: tuned.f1_score || 0,
+              training_time: tuned.training_time || 0,
               improvement: improvementText,
               badge: improvementValue > 0 ? 'Improved' : 'Regressed'
             })
@@ -130,13 +144,11 @@ export default function ResultsLeaderboard({
       }
     } else if (trainingData?.model_results && Array.isArray(trainingData.model_results)) {
       // Handle array format from ModelTraining component
-      console.log('Found model_results array from ModelTraining - processing...')
 
       // Check if all models have zero accuracy (training failed)
       const allZero = trainingData.model_results.every((m: any) => m.accuracy === 0)
 
       if (allZero) {
-        console.warn('All models have zero accuracy - training may have failed')
         // Return empty array to show proper empty state
         return []
       }
@@ -158,14 +170,7 @@ export default function ResultsLeaderboard({
       })
     }
 
-    // Fallback: Log if no results found
-    if (results.length === 0) {
-      console.log('No model results found in trainingData')
-      console.log('Available keys in trainingData:', trainingData ? Object.keys(trainingData) : 'trainingData is null')
-      if (trainingData?.execution_result) {
-        console.log('Available keys in execution_result:', Object.keys(trainingData.execution_result))
-      }
-    }
+    // No results found - return empty array
 
     if (results.length > 0) {
       // Sort by f1_score descending
@@ -184,12 +189,6 @@ export default function ResultsLeaderboard({
     return []
   }
 
-  const [modelResults, setModelResults] = useState<ModelRanking[]>(parseModelResults())
-
-  // Update results when trainingData changes (after tuning completion)
-  useEffect(() => {
-    setModelResults(parseModelResults())
-  }, [trainingData])
 
   const downloadModelReport = () => {
     const report = `
@@ -237,7 +236,6 @@ ${modelResults.map(model => `
 
       // Extract the actual model name from the display name (remove "(Baseline)" or "(Tuned)")
       const actualModelName = modelName.replace(/ \((Baseline|Tuned)\)/, '')
-      console.log(`Downloading model: ${modelName} -> ${actualModelName}`)
 
       const response = await fetch(`/api/download-model/${actualModelName}`, {
         method: 'GET',
@@ -357,7 +355,6 @@ ${modelResults.map(model => `
             hyperparameter_tuning: result,
             tuning_execution: executionResult
           }
-          console.log('Calling onResultsComplete with updated data:', updatedData)
           onResultsComplete(updatedData)
         }
       } else {

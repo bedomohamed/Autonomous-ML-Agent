@@ -193,17 +193,11 @@ export default function MLPipelineWizard() {
   }, [updateStepState, nextStep])
 
   const handleResultsComplete = useCallback((resultsData: any) => {
-    console.log('handleResultsComplete called with:', resultsData)
-    setPipelineState(prev => {
-      console.log('Previous pipeline state:', prev)
-      const newState = {
-        ...prev,
-        trainingData: resultsData, // Update trainingData with the new results
-        resultsData // Also keep resultsData for backward compatibility
-      }
-      console.log('New pipeline state:', newState)
-      return newState
-    })
+    setPipelineState(prev => ({
+      ...prev,
+      trainingData: resultsData,
+      resultsData
+    }))
     updateStepState(5, 'completed')
   }, [updateStepState])
 

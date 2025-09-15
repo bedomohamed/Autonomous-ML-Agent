@@ -66,7 +66,6 @@ export default function DataAnalysis({
       await new Promise(resolve => setTimeout(resolve, 800))
     }
 
-    console.log('DataAnalysis - sending request with:', { storage_key: storageKey, target_column: targetColumn })
 
     analyzeMutation.mutate(
       {
