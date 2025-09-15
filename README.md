@@ -1,53 +1,80 @@
-# CSV Upload & LLM Preprocessing Interface
+# Autonomous ML Agent Platform
 
-A web-based tool that leverages Claude AI and E2B sandboxing to automatically preprocess CSV datasets for machine learning. Upload your data, select a target column, and let AI generate and execute custom preprocessing code.
+A complete end-to-end machine learning platform that leverages Claude AI and E2B sandboxing to automatically preprocess datasets, train multiple ML models, and provide comprehensive performance analysis. Transform your raw CSV data into production-ready ML models with just a few clicks.
 
 ## Features
 
-- 📤 **CSV Upload**: Drag-and-drop CSV file upload with validation
-- 👀 **Data Preview**: View first 50 rows of your dataset instantly
-- 🎯 **Target Selection**: Choose prediction column via intuitive dropdown
-- 🤖 **AI-Powered Preprocessing**: Claude generates custom preprocessing code
-- 🔒 **Secure Execution**: Code runs in isolated E2B sandbox environment
-- ☁️ **Cloud Storage**: Files stored securely in AWS S3
-- 📥 **Download Results**: Get cleaned dataset ready for ML
+### 🚀 **Complete ML Pipeline**
+- **5-Step Wizard**: Upload → Analysis → Preprocessing → Training → Results
+- **Autonomous Operation**: Minimal user input required
+- **Real-time Progress**: Live updates throughout the pipeline
+
+### 📊 **Data Processing**
+- 📤 **CSV Upload**: Drag-and-drop with instant validation
+- 👀 **Smart Preview**: Automatic data analysis and insights
+- 🎯 **Target Selection**: Intelligent column recommendation
+- 🤖 **AI Preprocessing**: Claude generates custom cleaning code
+- 🔒 **Secure Execution**: Isolated E2B sandbox environment
+
+### 🧠 **Model Training & Evaluation**
+- **Multi-Model Training**: XGBoost, Random Forest, Decision Tree, Naive Bayes
+- **Performance Metrics**: Accuracy, Precision, Recall, F1-Score, Training Time
+- **Hyperparameter Tuning**: Automated optimization with baseline comparison
+- **Model Rankings**: Performance leaderboard with downloadable reports
+
+### 📈 **Results & Analytics**
+- **Interactive Dashboard**: Comprehensive performance visualization
+- **Model Comparison**: Side-by-side baseline vs tuned performance
+- **Export Options**: Download models, reports, and training code
+- **Time Tracking**: Detailed training duration metrics
 
 ## Tech Stack
 
 ### Backend
-- Flask (Python REST API)
-- AWS S3 (File storage)
-- Claude API (Code generation)
-- E2B (Sandbox execution)
-- Pandas (Data processing)
+- **Flask** (Python REST API)
+- **Claude AI** (Code generation & analysis)
+- **E2B** (Secure sandbox execution)
+- **Local Storage** (File management)
+- **scikit-learn** (ML algorithms)
+- **XGBoost** (Gradient boosting)
+- **Pandas** (Data processing)
 
 ### Frontend
-- React 18 with TypeScript
-- TailwindCSS (Styling)
-- Vite (Build tool)
-- Axios (API calls)
-- React Dropzone (File uploads)
+- **React 18** with TypeScript
+- **TailwindCSS** (Modern styling)
+- **Vite** (Fast build tool)
+- **React Hot Toast** (Notifications)
+- **Lucide React** (Icons)
+- **React Query** (Data fetching)
 
 ## Prerequisites
 
-- Python 3.11+
-- Node.js 18+
-- AWS Account with S3 access
-- Anthropic API key (Claude)
-- E2B API key
+- **Python 3.11+**
+- **Node.js 18+**
+- **Anthropic API key** (Claude AI)
+- **E2B API key** (Sandbox execution)
+- **Git** (Version control)
 
 ## Installation
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/csv-preprocessing-pipeline.git
-cd csv-preprocessing-pipeline
+git clone https://github.com/yourusername/autonomous-ml-agent.git
+cd autonomous-ml-agent
 ```
 
 ### 2. Set up environment variables
 ```bash
 cp .env.example .env
 # Edit .env with your API keys and configuration
+```
+
+Required environment variables:
+```env
+ANTHROPIC_API_KEY=your_claude_api_key_here
+E2B_API_KEY=your_e2b_api_key_here
+FLASK_ENV=development
+PORT=5000
 ```
 
 ### 3. Install Backend Dependencies
@@ -93,56 +120,105 @@ docker-compose up --build
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
 | POST | `/api/upload` | Upload CSV file |
-| POST | `/api/preprocess` | Run preprocessing pipeline |
-| GET | `/api/download/<s3_key>` | Get download URL |
+| POST | `/api/analyze-dataset` | Analyze dataset with Claude AI |
+| POST | `/api/preprocess` | Generate preprocessing code |
+| POST | `/api/execute-preprocessing` | Execute preprocessing in E2B |
+| POST | `/api/generate-training-code` | Generate model training code |
+| POST | `/api/execute-training` | Train models in E2B sandbox |
+| POST | `/api/tune-hyperparameters` | Generate hyperparameter tuning code |
+| POST | `/api/execute-hyperparameter-tuning` | Execute hyperparameter optimization |
+| GET | `/api/download-local/<file_key>` | Download processed files |
+| GET | `/api/download-model/<model_name>` | Download trained models |
 
 ## Usage
 
-1. **Upload CSV**: Drag and drop or click to upload your CSV file
-2. **Select Target**: Choose the column you want to predict from the dropdown
-3. **Run Pipeline**: Click "Start LLM Pipeline" to begin preprocessing
-4. **Download Results**: Get your cleaned dataset when processing completes
+### 🎯 **5-Step ML Pipeline**
 
-## Preprocessing Pipeline
+#### Step 1: Upload Dataset
+- Drag and drop your CSV file or click to browse
+- Instant file validation and preview
+- Automatic column detection and analysis
 
-The AI-powered preprocessing includes:
-- Missing value imputation
-- Outlier detection and removal
-- Feature standardization/normalization
-- Categorical encoding
-- Target column separation
+#### Step 2: Data Analysis
+- Claude AI analyzes your dataset structure
+- Identifies data quality issues and patterns
+- Provides intelligent preprocessing recommendations
+
+#### Step 3: Preprocessing
+- AI generates custom preprocessing code
+- Handles missing values, outliers, and encoding
+- Executes securely in E2B sandbox
+- Downloads cleaned dataset
+
+#### Step 4: Model Training
+- Trains 4 ML models automatically (XGBoost, Random Forest, Decision Tree, Naive Bayes)
+- Tracks training time and performance metrics
+- Saves models for deployment
+- Generates comprehensive evaluation reports
+
+#### Step 5: Results & Optimization
+- Interactive performance leaderboard
+- Hyperparameter tuning with baseline comparison
+- Model download and deployment options
+- Detailed analytics and recommendations
+
+### 🤖 **AI-Powered Preprocessing**
+
+The Claude AI preprocessing pipeline automatically handles:
+- **Data Cleaning**: Missing value imputation, duplicate removal
+- **Feature Engineering**: Scaling, normalization, encoding
+- **Outlier Detection**: Statistical and ML-based outlier removal
+- **Categorical Encoding**: One-hot encoding, label encoding
+- **Feature Selection**: Correlation analysis and feature importance
+- **Data Validation**: Type checking and consistency verification
 
 ## Project Structure
 
 ```
-.
+autonomous-ml-agent/
 ├── backend/
 │   ├── app/
 │   │   ├── __init__.py
-│   │   ├── routes.py
-│   │   ├── error_handlers.py
+│   │   ├── routes.py                    # API endpoints
+│   │   ├── error_handlers.py           # Error handling
 │   │   ├── services/
-│   │   │   ├── s3_service.py
-│   │   │   └── preprocessing_service.py
+│   │   │   ├── claude_service.py       # Claude AI integration
+│   │   │   ├── e2b_service.py          # Sandbox execution
+│   │   │   ├── local_storage_service.py # File management
+│   │   │   ├── data_analysis_service.py # Data analysis
+│   │   │   └── preprocessing_service.py # Preprocessing logic
 │   │   └── utils/
-│   │       └── validators.py
+│   │       └── validators.py           # Input validation
+│   ├── storage/                        # Local file storage
+│   │   ├── uploads/                    # Uploaded datasets
+│   │   ├── processed/                  # Cleaned datasets
+│   │   └── models/                     # Trained models
 │   ├── requirements.txt
 │   ├── Dockerfile
 │   └── run.py
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── FileUpload.tsx
-│   │   │   ├── CSVPreview.tsx
-│   │   │   ├── ColumnSelector.tsx
-│   │   │   └── PipelineRunner.tsx
+│   │   │   ├── FileUpload.tsx          # File upload interface
+│   │   │   ├── CSVPreview.tsx          # Data preview
+│   │   │   ├── DataAnalysis.tsx        # Analysis step
+│   │   │   ├── PreprocessingStep.tsx   # Preprocessing step
+│   │   │   ├── ModelTraining.tsx       # Training step
+│   │   │   ├── ResultsLeaderboard.tsx  # Results dashboard
+│   │   │   └── MLPipelineWizard.tsx    # Main wizard
+│   │   ├── hooks/
+│   │   │   └── api.ts                  # API hooks
 │   │   ├── types/
+│   │   │   └── index.ts                # TypeScript types
 │   │   ├── App.tsx
 │   │   └── main.tsx
 │   ├── package.json
 │   └── Dockerfile
 ├── docker-compose.yml
 ├── .env.example
+├── CLAUDE.md                          # Claude Code instructions
+├── PRD.md                             # Product requirements
+├── features.md                        # Feature documentation
 └── README.md
 ```
 
@@ -150,21 +226,35 @@ The AI-powered preprocessing includes:
 
 ### Environment Variables
 
+Create a `.env` file in the root directory:
+
 ```env
-# Flask
+# Flask Configuration
 FLASK_ENV=development
 PORT=5000
 
-# AWS
-AWS_ACCESS_KEY_ID=your_key
-AWS_SECRET_ACCESS_KEY=your_secret
-AWS_REGION=us-east-1
-AWS_BUCKET_NAME=your-bucket
+# AI Services
+ANTHROPIC_API_KEY=your_claude_api_key_here
+E2B_API_KEY=your_e2b_api_key_here
 
-# APIs
-ANTHROPIC_API_KEY=your_claude_key
-E2B_API_KEY=your_e2b_key
+# Optional: For production deployments
+# AWS_ACCESS_KEY_ID=your_aws_key
+# AWS_SECRET_ACCESS_KEY=your_aws_secret
+# AWS_REGION=us-east-1
+# AWS_BUCKET_NAME=your-bucket
 ```
+
+### API Key Setup
+
+1. **Anthropic API Key**:
+   - Sign up at [console.anthropic.com](https://console.anthropic.com)
+   - Create a new API key
+   - Add credits to your account
+
+2. **E2B API Key**:
+   - Sign up at [e2b.dev](https://e2b.dev)
+   - Create a new API key
+   - Configure sandbox templates
 
 ## Testing
 
@@ -190,24 +280,96 @@ Production-ready Docker images are provided for containerized deployment.
 
 ## Security Considerations
 
-- All file uploads are validated for type and size
-- Code execution happens in isolated E2B sandboxes
-- API keys should never be exposed to frontend
-- S3 presigned URLs expire after 1 hour
-- CORS configured for specific origins only
+- **File Validation**: All uploads validated for type, size, and content
+- **Sandboxed Execution**: All code runs in isolated E2B containers
+- **API Security**: Keys stored securely, never exposed to frontend
+- **Input Sanitization**: All user inputs validated and sanitized
+- **Local Storage**: Files stored locally with controlled access
+- **CORS Protection**: Configured for specific origins only
+- **Error Handling**: Comprehensive error handling without information leakage
+
+## Performance & Scalability
+
+- **Asynchronous Processing**: Non-blocking API operations
+- **Progress Tracking**: Real-time pipeline status updates
+- **Caching**: Intelligent caching of analysis results
+- **File Management**: Automatic cleanup of temporary files
+- **Resource Optimization**: Efficient memory usage during ML training
+- **Concurrent Processing**: Support for multiple users
+
+## Key Features & Benefits
+
+### 🎯 **For Data Scientists**
+- **Zero Setup**: No environment configuration required
+- **AI-Powered**: Intelligent preprocessing and feature engineering
+- **Multiple Models**: Compare 4 different algorithms automatically
+- **Hyperparameter Tuning**: Automated optimization with clear results
+- **Export Ready**: Download models and code for deployment
+
+### 🚀 **For Businesses**
+- **Rapid Prototyping**: From CSV to trained model in minutes
+- **No ML Expertise Required**: AI guides the entire process
+- **Cost Effective**: Local processing reduces cloud costs
+- **Secure**: No data leaves your environment
+- **Scalable**: Easy to integrate into existing workflows
+
+### 🔧 **For Developers**
+- **Modern Stack**: React, TypeScript, Flask, Docker
+- **Modular Design**: Easy to extend and customize
+- **API First**: RESTful architecture
+- **Documentation**: Comprehensive docs and examples
+- **Open Source**: MIT license for commercial use
+
+## Roadmap
+
+### 🚧 **Coming Soon**
+- **Deep Learning Models**: TensorFlow/PyTorch integration
+- **AutoML**: Automated architecture search
+- **Model Monitoring**: Performance tracking and drift detection
+- **API Deployment**: One-click model serving
+- **Advanced Visualizations**: Interactive model explainability
+- **Data Connectors**: Direct database and API integrations
+
+### 💡 **Feature Requests**
+- Multi-class classification support
+- Regression model training
+- Time series forecasting
+- Text and image preprocessing
+- Custom model architectures
+- Distributed training
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+We welcome contributions! Here's how to get started:
+
+1. **Fork the repository**
+2. **Create feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes**: Follow the coding standards
+4. **Add tests**: Ensure your code is well tested
+5. **Commit changes**: `git commit -m 'Add amazing feature'`
+6. **Push to branch**: `git push origin feature/amazing-feature`
+7. **Open Pull Request**: Describe your changes clearly
+
+### Development Guidelines
+- Follow TypeScript/Python best practices
+- Add comprehensive tests for new features
+- Update documentation for API changes
+- Ensure backward compatibility
+- Use conventional commit messages
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Support & Community
 
-For issues and questions, please open a GitHub issue.
+- **Issues**: [GitHub Issues](https://github.com/yourusername/autonomous-ml-agent/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/yourusername/autonomous-ml-agent/discussions)
+- **Documentation**: [Full Documentation](https://docs.yoursite.com)
+- **Examples**: Check the `/examples` directory
+
+---
+
+**⭐ Star this repository if you find it useful!**
+
+Made with ❤️ by the Autonomous ML Team
